@@ -1,0 +1,29 @@
+name: Python checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check project files
+        run: |
+          test -f pyproject.toml || { echo "::error::Missing pyproject.toml"; exit 1; }
+          test -f uv.lock || { echo "::error::Missing uv.lock"; exit 1; }
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --no-sync ruff format --check .
+      - run: uv run --no-sync ruff check .
+      - run: uv run --no-sync mypy .
+      - run: uv run --no-sync pytest
