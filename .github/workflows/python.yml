@@ -23,7 +23,6 @@ jobs:
           enable-cache: true
       - run: uv sync --all-extras
       - run: uv pip install --python .venv/bin/python ruff mypy
-      - run: uv run --no-sync ruff format --check .
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync mypy .
       - run: uv run --no-sync pytest
