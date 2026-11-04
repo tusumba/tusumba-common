@@ -1,5 +1,5 @@
 import httpx
-import pytest
+
 from tusumba_common import InternalClient
 
 
