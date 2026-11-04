@@ -2,8 +2,15 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from tusumba_common import (ApiError, CurrentUser, get_current_user, install_error_handlers,
-                            optional_user, require_moderator, require_service)
+from tusumba_common import (
+    ApiError,
+    CurrentUser,
+    get_current_user,
+    install_error_handlers,
+    optional_user,
+    require_moderator,
+    require_service,
+)
 from tusumba_common.testing import generate_keypair, make_token
 
 

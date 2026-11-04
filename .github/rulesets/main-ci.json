@@ -1,0 +1,41 @@
+{
+  "name": "Tusumba CI",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "repository_name": {
+      "include": [
+        "identity-service",
+        "events-service",
+        "ticketing-service",
+        "moderation-service",
+        "notifications-service",
+        "tusumba-contracts",
+        "tusumba-common",
+        "android",
+        "web"
+      ],
+      "exclude": []
+    },
+    "ref_name": {
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {
+            "context": "CI required",
+            "integration_id": 15368
+          }
+        ]
+      }
+    }
+  ]
+}

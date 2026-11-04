@@ -1,6 +1,7 @@
 import time
 
 import jwt
+
 from tusumba_common.testing import generate_keypair, make_token
 
 
