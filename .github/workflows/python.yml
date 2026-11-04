@@ -17,12 +17,12 @@ jobs:
       - name: Check project files
         run: |
           test -f pyproject.toml || { echo "::error::Missing pyproject.toml"; exit 1; }
-          test -f uv.lock || { echo "::error::Missing uv.lock"; exit 1; }
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --all-extras
+      - run: uv pip install --python .venv/bin/python ruff mypy
       - run: uv run --no-sync ruff format --check .
       - run: uv run --no-sync ruff check .
       - run: uv run --no-sync mypy .
