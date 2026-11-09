@@ -1,4 +1,6 @@
 """Единый формат ошибок: {"error": {"code": "...", "message": "..."}}."""
+from typing import Any
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -7,21 +9,23 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 class ApiError(Exception):
     def __init__(self, status_code: int, code: str, message: str,
-                 headers: dict[str, str] | None = None):
+                 headers: dict[str, str] | None = None,
+                 details: list[dict[str, str]] | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.headers = headers
+        self.details = details
 
 
 def error_response(status: int, code: str, message: str,
-                   headers: dict[str, str] | None = None) -> JSONResponse:
-    return JSONResponse(
-        status_code=status,
-        content={"error": {"code": code, "message": message}},
-        headers=headers,
-    )
+                   headers: dict[str, str] | None = None,
+                   details: list[dict[str, str]] | None = None) -> JSONResponse:
+    error: dict[str, object] = {"code": code, "message": message}
+    if details is not None:
+        error["details"] = details
+    return JSONResponse(status_code=status, content={"error": error}, headers=headers)
 
 
 _HTTP_CODES = {
@@ -30,11 +34,25 @@ _HTTP_CODES = {
     429: "too_many_requests",
 }
 
+VALIDATION_MESSAGE = "Проверьте введённые данные."
+_LOCATIONS = {"body", "query", "path", "header", "cookie"}
+_FIELD_MESSAGES = {"missing": "Заполните обязательное поле.", "json_invalid": "Некорректный JSON."}
+
+
+def _field_error(error: dict[str, Any]) -> dict[str, str]:
+    loc = [str(x) for x in error.get("loc", ())]
+    if loc and loc[0] in _LOCATIONS:
+        loc = loc[1:]
+    if error.get("type") == "json_invalid":
+        loc = []
+    message = _FIELD_MESSAGES.get(str(error.get("type")), "Некорректное значение.")
+    return {"field": ".".join(loc) or "body", "message": message}
+
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError):
-        return error_response(exc.status_code, exc.code, exc.message, exc.headers)
+        return error_response(exc.status_code, exc.code, exc.message, exc.headers, exc.details)
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException):
@@ -44,12 +62,8 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError):
-        parts = []
-        for e in exc.errors():
-            loc = ".".join(str(x) for x in e.get("loc", ()) if x != "body")
-            parts.append(f"{loc}: {e.get('msg')}" if loc else str(e.get("msg")))
-        return error_response(422, "validation_error",
-                              "Некорректные данные: " + "; ".join(parts))
+        details = [_field_error(e) for e in exc.errors()]
+        return error_response(422, "validation_error", VALIDATION_MESSAGE, details=details)
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception):
