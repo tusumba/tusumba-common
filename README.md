@@ -4,14 +4,14 @@
 
 - проверка пользователя по JWT (RS256, публичный ключ Identity);
 - защита и вызовы `/internal` по сервисному токену;
-- единый формат ошибок `{"error": {"code": "...", "message": "..."}}`.
+- единый формат ошибок `{"error": {"code": "...", "message": "..."}}`, у ошибок по полям ещё `details`.
 
 ## Установка
 
 В `requirements.txt` / `pyproject.toml` сервиса, по тегу версии:
 
 ```
-tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.2.0
+tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.3.0
 ```
 
 ## Переменные окружения
@@ -68,6 +68,8 @@ async def orders():
 | Необработанная ошибка | 500 | `internal_error` |
 
 Своя ошибка: `raise ApiError(409, "already_exists", "Уже существует")`.
+
+Ошибка валидации приходит с общим текстом «Проверьте введённые данные.» и списком `details`: в каждом элементе `field` — путь к полю без `body`, `query` и `path` (например `event.date`, `size`), `message` — текст на русском. Нужен текст из требования — бросьте свою ошибку с `details`: `raise ApiError(422, "validation_error", "Дата в прошлом.", details=[{"field": "date", "message": "Дата в прошлом."}])`.
 
 Формат токена: `sub` — id пользователя, `roles` — список строк, модератор — роль `moderator`, `typ` — `access`, `exp` — срок действия. Принимается только RS256.
 
