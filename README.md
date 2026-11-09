@@ -11,7 +11,7 @@
 В `requirements.txt` / `pyproject.toml` сервиса, по тегу версии:
 
 ```
-tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.1.0
+tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.2.0
 ```
 
 ## Переменные окружения
@@ -60,7 +60,7 @@ async def orders():
 | Ситуация | HTTP | `code` |
 |---|---|---|
 | Нет заголовка Authorization | 401 | `not_authenticated` |
-| Подпись неверна / токен повреждён | 401 | `invalid_token` |
+| Подпись неверна / токен повреждён / не access-токен | 401 | `invalid_token` |
 | Срок действия истёк | 401 | `token_expired` |
 | Нет нужной роли | 403 | `forbidden` |
 | `/internal` без верного токена | 403 | `forbidden` |
@@ -69,7 +69,9 @@ async def orders():
 
 Своя ошибка: `raise ApiError(409, "already_exists", "Уже существует")`.
 
-Формат токена: `sub` — id пользователя, `roles` — список строк, модератор — роль `moderator`. Принимается только RS256.
+Формат токена: `sub` — id пользователя, `roles` — список строк, модератор — роль `moderator`, `typ` — `access`, `exp` — срок действия. Принимается только RS256.
+
+Сервисы принимают только access-токен. Токен без `typ` или с другим значением, например refresh-токен (`typ` = `refresh`), получает 401 `invalid_token`: refresh-токен принимает только Identity в `POST /v1/auth/refresh`.
 
 ## Разработка
 
@@ -80,7 +82,7 @@ python -m tusumba_common.testing dev-keys
 export JWT_PUBLIC_KEY="$(cat dev-keys/public.pem)"
 ```
 
-В тестах сервиса: `from tusumba_common.testing import generate_keypair, make_token`.
+В тестах сервиса: `from tusumba_common.testing import generate_keypair, make_token`. `make_token` выпускает access-токен (`typ` = `access`), другой тип можно передать в `typ`.
 
 ```
 pip install -e ".[dev]"

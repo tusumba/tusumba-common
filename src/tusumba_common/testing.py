@@ -23,10 +23,10 @@ def generate_keypair() -> tuple[str, str]:
 
 
 def make_token(private_pem: str, user_id: str = "1", roles: list[str] | None = None,
-               expires_in: int = 3600) -> str:
+               expires_in: int = 3600, typ: str = "access") -> str:
     now = int(time.time())
     return jwt.encode(
-        {"sub": user_id, "roles": roles or [], "iat": now, "exp": now + expires_in},
+        {"sub": user_id, "roles": roles or [], "typ": typ, "iat": now, "exp": now + expires_in},
         private_pem, algorithm="RS256",
     )
 

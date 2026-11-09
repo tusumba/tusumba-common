@@ -8,6 +8,7 @@ from fastapi import Depends, Request
 from .errors import ApiError
 
 MODERATOR_ROLE = "moderator"
+ACCESS_TOKEN_TYPE = "access"
 
 
 @dataclass(frozen=True)
@@ -37,11 +38,14 @@ def _decode(token: str) -> CurrentUser:
             token,
             _public_key(),
             algorithms=["RS256"],  # только RS256: защита от alg=none/HS256
-            options={"require": ["sub", "exp"]},
+            options={"require": ["sub", "exp", "typ"]},
         )
     except jwt.ExpiredSignatureError:
         raise _unauthorized("token_expired", "Срок действия токена истёк")
     except jwt.PyJWTError:
+        raise _unauthorized("invalid_token", "Недействительный токен")
+    # refresh-токен (typ = refresh) принимает только Identity в /v1/auth/refresh
+    if payload["typ"] != ACCESS_TOKEN_TYPE:
         raise _unauthorized("invalid_token", "Недействительный токен")
     roles = payload.get("roles") or []
     if not isinstance(roles, list):
