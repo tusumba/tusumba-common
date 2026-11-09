@@ -35,6 +35,23 @@ def test_hs256_and_none_rejected(client, keys):
     assert client.get("/me", headers=bearer(none)).status_code == 401
 
 
+def test_refresh_token_rejected(client, keys):
+    claims = {"sub": "1", "typ": "refresh", "exp": int(time.time()) + 60}
+    refresh = jwt.encode(claims, keys[0], algorithm="RS256")
+    for path in ("/me", "/public"):
+        r = client.get(path, headers=bearer(refresh))
+        assert r.status_code == 401
+        assert r.json()["error"]["code"] == "invalid_token"
+
+
+def test_token_without_typ_rejected(client, keys):
+    claims = {"sub": "1", "roles": ["user"], "exp": int(time.time()) + 60}
+    legacy = jwt.encode(claims, keys[0], algorithm="RS256")
+    r = client.get("/me", headers=bearer(legacy))
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "invalid_token"
+
+
 def test_no_token(client):
     r = client.get("/me")
     assert r.status_code == 401
