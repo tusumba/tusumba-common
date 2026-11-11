@@ -4,6 +4,7 @@
 
 - проверка пользователя по JWT (RS256, публичный ключ Identity);
 - защита и вызовы `/internal` по сервисному токену;
+- проверка прав на мероприятие и секцию через Events & Clubs с кешем в Redis;
 - единый формат ошибок `{"error": {"code": "...", "message": "..."}}`, у ошибок по полям ещё `details`.
 
 ## Установка
@@ -11,7 +12,7 @@
 В `requirements.txt` / `pyproject.toml` сервиса, по тегу версии:
 
 ```
-tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.3.0
+tusumba-common @ git+https://github.com/tusumba/tusumba-common.git@v0.4.0
 ```
 
 ## Переменные окружения
@@ -75,6 +76,39 @@ async def orders():
 
 Сервисы принимают только access-токен. Токен без `typ` или с другим значением, например refresh-токен (`typ` = `refresh`), получает 401 `invalid_token`: refresh-токен принимает только Identity в `POST /v1/auth/refresh`.
 
+## Права на мероприятие и секцию
+
+`PermissionsClient` спрашивает Events & Clubs (`GET /internal/events/{id}/permissions?user_id=` и
+`GET /internal/clubs/{id}/permissions?user_id=`, OpenAPI Events) и кеширует ответ в Redis на 30-60 секунд
+(по умолчанию 45). Сервисный токен клиент добавляет сам. Нужен пакет `redis`:
+`tusumba-common[redis] @ git+https://github.com/tusumba/tusumba-common.git@v0.4.0`.
+
+```python
+from redis.asyncio import Redis
+from tusumba_common import ApiError, PermissionsClient
+
+redis = Redis.from_url("redis://redis:6379/0", decode_responses=True)
+permissions = PermissionsClient("http://events:8000", redis)   # redis=None - без кеша
+
+# Ticketing, Moderation: роль в команде мероприятия
+perms = await permissions.event_permissions(event_id, user.id)
+if not perms.has_role("owner", "admin"):
+    raise ApiError(403, "forbidden", "Недостаточно прав.")
+
+# Moderation: заявка от имени секции
+if not (await permissions.club_permissions(club_id, user.id)).is_admin:
+    raise ApiError(403, "club_forbidden", "У вас нет прав на выбранную секцию.")
+```
+
+- `EventPermissions`: `is_member`, `role` (`owner`, `admin`, `editor`, `scanner` или `None`), `has_role(*roles)`;
+  `ClubPermissions`: `is_admin`;
+- нет мероприятия или секции - `ApiError` 404 с кодом `event_not_found` или `club_not_found` (не кешируется);
+- Events не ответил, вернул 5xx или отклонил сервисный токен - `ApiError` 503 `service_unavailable`, в кеш не попадает;
+- Redis недоступен - клиент пишет предупреждение в лог и ходит в Events напрямую;
+- после смены роли можно сбросить кеш: `await permissions.invalidate_event(event_id, user_id)` (так же `invalidate_club`);
+  иначе новая роль подхватится не позже чем через минуту;
+- в конце работы: `await permissions.aclose()`.
+
 ## Разработка
 
 Тестовая пара ключей:
@@ -87,7 +121,7 @@ export JWT_PUBLIC_KEY="$(cat dev-keys/public.pem)"
 В тестах сервиса: `from tusumba_common.testing import generate_keypair, make_token`. `make_token` выпускает access-токен (`typ` = `access`), другой тип можно передать в `typ`.
 
 ```
-pip install -e ".[dev]"
+pip install -e ".[dev]"   # с redis и fakeredis для тестов
 pytest
 ```
 
